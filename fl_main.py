@@ -36,7 +36,7 @@ def as_python_object(dct):
     return dct
 
 
-def fed_args():
+def fed_args():  # args.config为传入的路径
     """
     Arguments for running federated learning baselines
     :return: Arguments for federated learning baselines
@@ -47,19 +47,20 @@ def fed_args():
 
     args = parser.parse_args()
     return args
-    
+
 
 def fed_run():
     """
     Main function for the baselines of federated learning
     """
     args = fed_args()
-    with open(args.config, "r") as yaml_file:
+    with open(args.config, "r") as yaml_file:  # 读入yaml 存储到config变量里
         try:
             config = yaml.safe_load(yaml_file)
         except yaml.YAMLError as exc:
             print(exc)
-    
+
+    # 小小的检测一下可用性
     algo_list = ["FedAvg", "SCAFFOLD", "FedProx", "FedNova"]
     assert config["client"]["fed_algo"] in algo_list, "The federated learning algorithm is not supported"
 
@@ -69,6 +70,7 @@ def fed_run():
     model_list = ["LeNet", 'AlexCifarNet', "ResNet18", "ResNet34", "ResNet50", "ResNet101", "ResNet152", "CNN"]
     assert config["system"]["model"] in model_list, "The model is not supported"
 
+    # 小小的设置一下随机种子
     np.random.seed(config["system"]["i_seed"])
     torch.manual_seed(config["system"]["i_seed"])
     random.seed(config["system"]["i_seed"])
@@ -76,31 +78,45 @@ def fed_run():
     client_dict = {}
     recorder = Recorder()
 
-    trainset_config, testset = divide_data(num_client=config["system"]["num_client"], num_local_class=config["system"]["num_local_class"], dataset_name=config["system"]["dataset"],
+    trainset_config, testset = divide_data(num_client=config["system"]["num_client"],
+                                           num_local_class=config["system"]["num_local_class"],
+                                           dataset_name=config["system"]["dataset"],
                                            i_seed=config["system"]["i_seed"])
     max_acc = 0
     # Initialize the clients w.r.t. the federated learning algorithms and the specific federated settings
     for client_id in trainset_config['users']:
         if config["client"]["fed_algo"] == 'FedAvg':
-            client_dict[client_id] = FedClient(client_id, dataset_id=config["system"]["dataset"], epoch=config["client"]["num_local_epoch"], model_name=config["system"]["model"])
+            client_dict[client_id] = FedClient(client_id, dataset_id=config["system"]["dataset"],
+                                               epoch=config["client"]["num_local_epoch"],
+                                               model_name=config["system"]["model"])
         elif config["client"]["fed_algo"] == 'SCAFFOLD':
-            client_dict[client_id] = ScaffoldClient(client_id, dataset_id=config["system"]["dataset"], epoch=config["client"]["num_local_epoch"], model_name=config["system"]["model"])
+            client_dict[client_id] = ScaffoldClient(client_id, dataset_id=config["system"]["dataset"],
+                                                    epoch=config["client"]["num_local_epoch"],
+                                                    model_name=config["system"]["model"])
         elif config["client"]["fed_algo"] == 'FedProx':
-            client_dict[client_id] = FedProxClient(client_id, dataset_id=config["system"]["dataset"], epoch=config["client"]["num_local_epoch"], model_name=config["system"]["model"])
+            client_dict[client_id] = FedProxClient(client_id, dataset_id=config["system"]["dataset"],
+                                                   epoch=config["client"]["num_local_epoch"],
+                                                   model_name=config["system"]["model"])
         elif config["client"]["fed_algo"] == 'FedNova':
-            client_dict[client_id] = FedNovaClient(client_id, dataset_id=config["system"]["dataset"], epoch=config["client"]["num_local_epoch"], model_name=config["system"]["model"])
+            client_dict[client_id] = FedNovaClient(client_id, dataset_id=config["system"]["dataset"],
+                                                   epoch=config["client"]["num_local_epoch"],
+                                                   model_name=config["system"]["model"])
         client_dict[client_id].load_trainset(trainset_config['user_data'][client_id])
 
     # Initialize the clients w.r.t. the federated learning algorithms and the specific federated settings
     if config["client"]["fed_algo"] == 'FedAvg':
-        fed_server = FedServer(trainset_config['users'], dataset_id=config["system"]["dataset"], model_name=config["system"]["model"])
+        fed_server = FedServer(trainset_config['users'], dataset_id=config["system"]["dataset"],
+                               model_name=config["system"]["model"])
     elif config["client"]["fed_algo"] == 'SCAFFOLD':
-        fed_server = ScaffoldServer(trainset_config['users'], dataset_id=config["system"]["dataset"], model_name=config["system"]["model"])
+        fed_server = ScaffoldServer(trainset_config['users'], dataset_id=config["system"]["dataset"],
+                                    model_name=config["system"]["model"])
         scv_state = fed_server.scv.state_dict()
     elif config["client"]["fed_algo"] == 'FedProx':
-        fed_server = FedServer(trainset_config['users'], dataset_id=config["system"]["dataset"], model_name=config["system"]["model"])
+        fed_server = FedServer(trainset_config['users'], dataset_id=config["system"]["dataset"],
+                               model_name=config["system"]["model"])
     elif config["client"]["fed_algo"] == 'FedNova':
-        fed_server = FedNovaServer(trainset_config['users'], dataset_id=config["system"]["dataset"], model_name=config["system"]["model"])
+        fed_server = FedNovaServer(trainset_config['users'], dataset_id=config["system"]["dataset"],
+                                   model_name=config["system"]["model"])
     fed_server.load_testset(testset)
     global_state_dict = fed_server.state_dict()
 
@@ -159,10 +175,10 @@ def fed_run():
             os.makedirs(config["system"]["res_root"])
 
         with open(os.path.join(config["system"]["res_root"], '[\'%s\',' % config["client"]["fed_algo"] +
-                                        '\'%s\',' % config["system"]["model"] +
-                                        str(config["client"]["num_local_epoch"]) + ',' +
-                                        str(config["system"]["num_local_class"]) + ',' +
-                                        str(config["system"]["i_seed"])) + ']', "w") as jsfile:
+                                                             '\'%s\',' % config["system"]["model"] +
+                                                             str(config["client"]["num_local_epoch"]) + ',' +
+                                                             str(config["system"]["num_local_class"]) + ',' +
+                                                             str(config["system"]["i_seed"])) + ']', "w") as jsfile:
             json.dump(recorder.res, jsfile, cls=PythonObjectEncoder)
 
 
